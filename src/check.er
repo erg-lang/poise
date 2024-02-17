@@ -1,0 +1,62 @@
+{time!;} = pyimport "time"
+{exists!;} = pyimport "os/path"
+sub = pyimport "subprocess"
+ac = import "ansicolor"
+
+{download_dependencies_on_demand!;} = import "download"
+{load_package_er_as_json!;} = import "metadata"
+{Config;} = import "cfg"
+
+.check!(cfg: Config) =
+    start = time!()
+    vers = download_dependencies_on_demand!()
+    print! "\{ac.GREEN}Checking\{ac.RESET}: \{cfg.project_root.stem}"
+    metadata = load_package_er_as_json!()
+    if! metadata.get("pre_build") isnot! None, do!:
+        path = metadata["pre_build"]
+        assert path in Str
+        print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (pre-build script)"
+        res = sub.run!(["erg", "run", path])
+        if! res.returncode != 0, do!:
+            panic "\{ac.RED}Error\{ac.RESET}: pre-build failed!"
+    typ = metadata.get("type", "app")
+    assert typ in Str
+    entry = match typ:
+        "app" -> "src/main.er"
+        "lib" -> "src/lib.er"
+        "decl" -> "src/lib.d.er"
+        _ -> panic "unknown package type: \{typ}"
+    if not(exists!(entry)), do:
+        panic "\{ac.RED}Error\{ac.RESET}: entry point \{entry} not found."
+    cmd = !["erg", "check"]
+    for! vers.items(), ((name, vers),) =>
+        for! vers, (pack,) =>
+            if! pack.path == None:
+                do!:
+                    cmd.push! "--use-package"
+                    cmd.push! "\{name}"
+                    cmd.push! pack.as_name
+                    cmd.push! "\{pack.version}"
+                do!:
+                    cmd.push! "--use-local-package"
+                    cmd.push! "\{name}"
+                    cmd.push! pack.as_name
+                    cmd.push! "\{pack.version}"
+                    cmd.push! "\{pack.path}"
+    cmd.push! entry
+    res = sub.run!(cmd, capture_output:=True)
+    if! res.returncode != 0, do!:
+        print! "\{ac.RED}Error\{ac.RESET}: compilation failed!"
+        if! res.stderr in Bytes, do!:
+            print! res.stderr.decode("utf-8")
+        exit 1
+    if! metadata.get("post_build") isnot! None, do!:
+        path = metadata["post_build"]
+        assert path in Str
+        print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (post-build script)"
+        res = sub.run!(["erg", "run", path])
+        if! res.returncode != 0, do!:
+            panic "\{ac.RED}Error\{ac.RESET}: post-build failed!"
+    end = time!()
+    elapsed = end - start
+    print! "\{ac.GREEN}Finished\{ac.RESET}: elapsed \{"{:.3g}".format(elapsed)}s"

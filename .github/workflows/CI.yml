@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_CLI_AUTH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - uses: erg-lang/setup-erg@v2.1
+      - name: Build
+        run: |
+          erg --version
+          timeout 30s erg src/main.er
+      - name: Install
+        run: |
+          timeout 30s erg src/main.er -- install
+      - name: Test
+        run: |
+          poise --version
+          poise help
+          poise build
+          poise check
+          poise clean
+          poise run
+          poise metadata
+          poise metadata --format json
+          poise install
+          echo n | poise publish --debug

@@ -1,0 +1,28 @@
+{Path;} = pyimport "pathlib"
+os = pyimport "os"
+sys = pyimport "sys"
+
+.Config = Class {
+    .project_root = Path;
+    # build, init, install, etc.
+    .mode = Str;
+    .debug = Bool;
+    .lib = Bool;
+    .no_verify = Bool;
+    .allow_dirty = Bool;
+    .certified = Bool;
+    .args = Array(Str);
+}
+.Config.
+    parse!(): Self =
+        mode = if len(sys.argv) > 1, do sys.argv[1], do "help"
+        Self {
+            .project_root = Path os.getcwd!();
+            .mode;
+            .debug = "--debug" in sys.argv;
+            .lib = "--lib" in sys.argv;
+            .no_verify = "--no-verify" in sys.argv;
+            .allow_dirty = "--allow-dirty" in sys.argv;
+            .certified = "--certified" in sys.argv;
+            .args = sys.argv[1..10000];
+        }

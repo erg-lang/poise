@@ -1,0 +1,18 @@
+{Config;} = import "cfg"
+
+.help! _: Config = print! """
+USAGE:
+    erg pack [COMMAND] [ARGS]...
+
+Commands:
+    build     Build the project
+    clean     Clear the cache
+    help      Print this help message
+    init      Initialize the project
+    install   Install specified packages
+    uninstall Uninstall specified packages
+    metadata  Print the project metadata
+    publish   Publish the project to package-index
+    run       Run the project
+    update    Update the project dependencies
+"""

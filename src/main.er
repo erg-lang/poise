@@ -1,0 +1,35 @@
+{Config;} = import "cfg"
+{build!;} = import "build"
+{check!;} = import "check"
+{clean!;} = import "clean"
+{initialize!; new!} = import "initializ"
+{install!;} = import "install"
+{uninstall!;} = import "uninstall"
+{publish!;} = import "publish"
+{run!;} = import "runn"
+{help!;} = import "help"
+{metadata!;} = import "metadata"
+{test!;} = import "test"
+{update!;} = import "updat"
+
+main!() =
+    cfg = Config.parse!()
+    match cfg.mode:
+        "build" => build! cfg
+        "check" => check! cfg
+        "clean" => clean! cfg, "."
+        "help" => help! cfg
+        "init" => initialize! cfg, "."
+        "run" => run! cfg, "."
+        "install" => install! cfg, cfg.args.get(1)
+        "uninstall" => uninstall! cfg, cfg.args.get(1)
+        "publish" => publish! cfg
+        "metadata" => metadata! cfg
+        "new" => new! cfg
+        "test" => test! cfg
+        "update" => update! cfg
+        "--version" => print! "poise 0.0.1"
+        mode => todo "unknown mode: \{mode}"
+
+if! __name__ == "__main__", do!:
+    main!()

@@ -1,0 +1,13 @@
+.name = "poise"
+.version = "0.0.1"
+.description = "The Erg package manager"
+.authors = ["Shunsuke Shibayama <sybm1346@gmail.com>"]
+.license = "MIT or Apache-2.0"
+.repository = "https://github.com/erg-lang/poise"
+.type = "app"
+
+.features = {
+    .debug = []
+}
+
+.dependencies = {=}

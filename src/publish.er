@@ -1,0 +1,108 @@
+json = pyimport "json"
+sub = pyimport "subprocess"
+{make_archive!; rmtree!; copy!} = pyimport "shutil"
+os = pyimport "os"
+ac = import "ansicolor"
+{SemVer;} = import "semver"
+
+{Config;} = import "cfg"
+{check!;} = import "check"
+{load_package_er_as_json!;} = import "metadata"
+{enter_package_index!; clone_package_index_if_not_exists!;} = import "download"
+{download_dependencies_on_demand!;} = import "download"
+
+.get_github_username!() =
+    res = sub.run! ["gh", "api", "user"], capture_output:=True
+    out = res.stdout
+    assert out in Bytes
+    data = json.loads out.decode "utf-8"
+    assert data in {Str: Obj}
+    login = data["login"]
+    assert login in Str
+    login
+
+check_commit!(cfg: Config) =
+    res = sub.run! ["git", "status", "--porcelain"], capture_output:=True
+    out = res.stdout
+    assert out in Bytes
+    if out != bytes() and not(cfg.allow_dirty), do:
+        panic """\{ac.RED}Error\{ac.RESET}: There are uncommitted changes in the current branch.
+If you want to publish anyway, use the `--allow-dirty` flag."""
+
+validate_package_er(metadata: {Str: Str or Array(Str) or Record}) =
+    if metadata.get("name") == None:
+        do panic "\{ac.RED}Error\{ac.RESET} in package.er: `name` is missing"
+        do assert metadata["name"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `name` must be a string"
+    if metadata.get("version") == None:
+        do panic "\{ac.RED}Error\{ac.RESET} in package.er: `version` is missing"
+        do:
+            assert metadata["version"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `version` must be a string or a Version"
+            discard SemVer.from_str metadata["version"]
+    if metadata.get("description") == None:
+        do panic "\{ac.RED}Error\{ac.RESET} in package.er: `description` is missing"
+        do assert metadata["description"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `description` must be a string"
+    if metadata.get("license") == None:
+        do panic "\{ac.RED}Error\{ac.RESET} in package.er: `license` is missing"
+        do assert metadata["license"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `license` must be a string"
+    if metadata.get("type") == None:
+        do panic "\{ac.RED}Error\{ac.RESET} in package.er: `type` is missing (\"app\", \"lib\", \"hybrid\" or \"decl\")"
+        do:
+            assert metadata["type"] in Str
+            assert metadata["type"] in {"app", "lib", "hybrid", "decl"}:
+                "\{ac.RED}Error\{ac.RESET} in package.er: `type` must be \"app\", \"lib\", \"hybrid\" or \"decl\""
+    if metadata.get("authors") == None:
+        do panic "\{ac.RED}Error\{ac.RESET} in package.er: `authors` is missing"
+        do assert metadata["authors"] in Array(Str):
+            "\{ac.RED}Error\{ac.RESET} in package.er: `authors` must be a list of strings"
+
+create_pr! cfg: Config, user_name, metadata =
+    discard sub.run! ["git", "sparse-checkout", "disable"], capture_output:=True
+    branch_name = "\{user_name}/\{cfg.project_root.stem}"
+    dir_name = if cfg.certified, do "certified/\{cfg.project_root.stem}", do "developers/\{user_name}/\{cfg.project_root.stem}"
+    version = SemVer.from_str metadata["version"]
+    file_name = "\{cfg.project_root.stem}-\{version}"
+    if! sub.run!(["git", "show-ref", "refs/heads/\{branch_name}"], capture_output:=True).returncode == 0:
+        do!:
+            discard sub.run! ["git", "checkout", branch_name], capture_output:=True
+            # discard subprocess.run! ["git", "pull", "--ff-only", "origin", branch_name]
+        do!:
+            discard sub.run! ["git", "checkout", "-b", branch_name], capture_output:=True
+    res0 = sub.run! ["git", "add", "\{dir_name}/package.er"], capture_output:=True
+    if res0.returncode != 0:
+        panic "\{ac.RED}Error\{ac.RESET}: Could not add package.er to the index"
+    discard sub.run! ["git", "add", "\{dir_name}/\{file_name}.zip"], capture_output:=True
+    discard sub.run! ["git", "commit", "-m", "publish \{cfg.project_root.stem}"] #, capture_output:=True
+    discard sub.run! ["git", "push", "--set-upstream", "origin", branch_name], capture_output:=True
+    title = "publish \{cfg.project_root.stem}@\{version}"
+    body = "Add `\{cfg.project_root.stem}@\{version}` to package-index/\{dir_name}."
+    discard sub.run! ["gh", "pr", "create", "--base", "main", "--head", branch_name, "--title", title, "--body", body]
+    discard sub.run! ["git", "checkout", "main"], capture_output:=True
+
+.publish! cfg: Config =
+    discard download_dependencies_on_demand!()
+    check_commit! cfg
+    metadata = load_package_er_as_json!()
+    assert metadata in {Str: Str or Array(Str) or Record}
+    validate_package_er metadata
+    if! not(cfg.no_verify), do!:
+        check!(cfg)
+    erg_path = os.environ["ERG_PATH"]
+    user_name = .get_github_username!()
+    clone_package_index_if_not_exists!()
+    package_path = if cfg.certified, do "\{erg_path}/package-index/certified/\{cfg.project_root.stem}" , do "\{erg_path}/package-index/developers/\{user_name}/\{cfg.project_root.stem}"
+    assert metadata["version"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `version` must be a semver string"
+    version = SemVer.from_str metadata["version"]
+    file_name = "\{cfg.project_root.stem}-\{version}"
+    dst = "\{package_path}/\{file_name}"
+    if! os.path.exists!(dst), do!:
+        rmtree! dst
+    print! "\{ac.GREEN}Archiving\{ac.RESET}: \{file_name}.zip"
+    discard make_archive! dst, "zip", "."
+    discard copy! "package.er", "\{package_path}/package.er"
+    print! "\{ac.GREEN}Archived\{ac.RESET}: \{file_name}.zip"
+    enter_package_index!()
+    if! cfg.debug, do!:
+        ok = input! "Are you sure you want to register \{cfg.project_root.stem} in the package index? [y/n] "
+        if ok != "y":
+            exit 0
+    create_pr! cfg, user_name, metadata

@@ -1,0 +1,43 @@
+os = pyimport "os"
+json = pyimport "json"
+sub = pyimport "subprocess"
+{Config;} = import "cfg"
+
+Options = Class {
+    .format = Str
+}
+Options.
+    parse! args: [Str; _] =
+        format = !"erg"
+        idx = !1
+        while! do! args.get(idx) != None, do!:
+            match! args.get(idx):
+                "--format" =>
+                    fmt = args.get(idx + 1)
+                    assert fmt in Str, "No format specified"
+                    format.update! _ -> fmt
+                _ => None
+            idx.inc!()
+        Self { .format; }
+
+.load_er_as_json!(file) =
+    json_path = file.replace ".er", ".json"
+    discard sub.run! ["erg", "transpile", "--transpile-target", "json", file]
+    res = with! open!(json_path), f =>
+        data = json.loads f.read!()
+        assert data in {Str: Obj}
+        data
+    os.remove! json_path
+    res
+
+.load_package_er_as_json!() = .load_er_as_json! "package.er"
+
+.metadata! cfg: Config =
+    options = Options.parse! cfg.args
+    match options.format:
+        "json" =>
+            print! .load_package_er_as_json!()
+        _ =>
+            with! open!("package.er"), f =>
+                s = f.read!()
+                print! s

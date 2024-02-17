@@ -1,0 +1,25 @@
+{which!;} = pyimport "shutil"
+platform = pyimport "platform"
+{run! = r!;} = pyimport "subprocess"
+ac = import "ansicolor"
+
+{build!;} = import "build"
+{load_package_er_as_json!;} = import "metadata"
+{Config;} = import "cfg"
+
+.run! cfg: Config, _: PathLike =
+    metadata = load_package_er_as_json!()
+    assert metadata.get("type") in Str, "\{ac.RED}Error\{ac.RESET} in package.er: required field `type` must be a string"
+    if! metadata.get("type") == "lib", do!:
+        print! "\{ac.RED}Error\{ac.RESET}: \{cfg.project_root.stem} is not an executable but a library"
+        exit 1
+    build! cfg
+    # args[0] == "run"
+    print! "\{ac.GREEN}Running\{ac.RESET}: \{cfg.project_root.stem}"
+    opt_py_command = metadata.get("py_command")
+    assert opt_py_command in (Str or NoneType)
+    py_command = if! opt_py_command != None, do opt_py_command, do! if platform.system!() == "Windows":
+        do "python"
+        do "python3"
+    assert which!(py_command) != None, "\{ac.RED}Error\{ac.RESET}: \{py_command} not found"
+    discard r! [py_command, "./build/\{cfg.project_root.stem}.pyc"] + cfg.args[1..10000]

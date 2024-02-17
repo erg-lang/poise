@@ -1,0 +1,10 @@
+{exists!;} = pyimport "os/path"
+{remove!;} = pyimport "os"
+
+{download_dependencies!;} = import "download"
+{Config;} = import "cfg"
+
+.update! _: Config =
+    if! exists!("package.lock.er"), do!:
+        remove! "package.lock.er"
+    discard download_dependencies!()

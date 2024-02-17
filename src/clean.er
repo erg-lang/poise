@@ -1,0 +1,9 @@
+{exists!;} = pyimport "os/path"
+{rmtree!;} = pyimport "shutil"
+
+{Config;} = import "cfg"
+
+.clean! _: Config, path: PathLike =
+    print! "Cleaning up build directory..."
+    if! exists!("\{path}/build"), do!:
+        rmtree! "\{path}/build"

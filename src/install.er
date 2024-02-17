@@ -1,0 +1,63 @@
+platform = pyimport "platform"
+pathlib = pyimport "pathlib"
+{unpack_archive!;} = pyimport "shutil"
+{copy!;} = pyimport "shutil"
+{getcwd!; getenv!; chdir!; chmod!} = pyimport "os"
+ac = import "ansicolor"
+
+{load_package_er_as_json!;} = import "metadata"
+{build!;} = import "build"
+{Config;} = import "cfg"
+{download!; PackageName} = import "download"
+
+.install! cfg: Config, path: PathLike or NoneType =
+    if! path isnot! None:
+        do!: .install_package! cfg, path
+        do!: .install_local! cfg
+
+.install_local! cfg: Config =
+    metadata = load_package_er_as_json!()
+    type = metadata.get("type", "lib")
+    assert type in Str
+    if type == "lib", do:
+        panic """\{ac.RED}Error\{ac.RESET}: cannot install \{metadata["name"]} bacause it is a library.
+To use it as a dependency, add it to the "dependencies" list in the package.er file."""
+    build! cfg
+    name = cfg.project_root.stem
+    erg_path = getenv! "ERG_PATH"
+    pyc_path_old = "build/\{name}.pyc"
+    pyc_path = "\{erg_path}/bin/\{name}.pyc"
+    copy! pyc_path_old, pyc_path
+    exec_path = if platform.system!() == "Windows":
+        do "\{erg_path}/bin/\{name}.bat"
+        do "\{erg_path}/bin/\{name}"
+    with! open!(exec_path, "w"), f =>
+        code = if platform.system!() == "Windows":
+            do "@echo off\npython \{pyc_path} %*"
+            do "python3 \{pyc_path} $@"
+        discard f.write! code
+    chmod! exec_path, 0o755
+    print! "\{ac.GREEN}Installed\{ac.RESET}: \{name} v\{metadata.get("version", "???")} (\{exec_path})"
+
+.install_package! cfg: Config, p: PathLike =
+    path = PackageName.parse str p
+    package_path = download! path
+    chdir! package_path
+    json = load_package_er_as_json!()
+    zip_name = "\{json["name"]}-\{json["version"]}.zip"
+    package_name = json["name"]
+    assert package_name in Str
+    unpack_archive! zip_name, package_name
+    chdir! package_name
+    build_cfg = Config.new({
+        .mode = "install";
+        .project_root = pathlib.Path getcwd!();
+        .debug = cfg.debug;
+        .lib = cfg.lib;
+        .no_verify = cfg.no_verify;
+        .allow_dirty = cfg.allow_dirty;
+        .certified = cfg.certified;
+        .args = cfg.args;
+    })
+    .install_local! build_cfg
+

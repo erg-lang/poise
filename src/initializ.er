@@ -1,0 +1,67 @@
+{chdir!;} = pyimport "os"
+sub = pyimport "subprocess"
+{exists!;} = pyimport "os/path"
+{mkdir!;} = pyimport "os"
+ac = import "ansicolor"
+
+{Config;} = import "cfg"
+
+initialize_tests! cfg: Config, path: PathLike =
+    mkdir! "\{path}/tests"
+    with! open!("\{path}/tests/test.er", "w"), f =>
+        name = cfg.project_root.stem
+        discard f.write! "\{name} = import \"\{name}\"\n\n"
+        discard f.write! ".test_add() =\n"
+        discard f.write! "    assert \{name}.add(1, 1) == 2\n"
+
+.initialize! cfg: Config, path: PathLike =
+    if! not(exists!("\{path}/.gitignore")), do!:
+        with! open!("\{path}/.gitignore", "w"), f =>
+            discard f.write! "build/\n"
+    if! not(exists!("\{path}/src")), do!:
+        mkdir! "\{path}/src"
+    if! cfg.lib:
+        do!:
+            with! open!("\{path}/src/lib.er", "w"), f =>
+                discard f.write! ".add l, r = l + r\n"
+                initialize_tests! cfg, path
+        do!:
+            with! open!("\{path}/src/main.er", "w"), f =>
+                discard f.write! "print! \"Hello, world!\"\n"
+    if! not(exists!("\{path}/doc")), do!:
+        mkdir! "\{path}/doc"
+    if! not(exists!("\{path}/package.er")), do!:
+        with! open!("\{path}/package.er", "w"), f =>
+            raw_author = sub.run!(["git", "config", "user.name"], capture_output:=True).stdout
+            author = if raw_author != None:
+                do: ".authors = [\"\{raw_author.decode().strip()}\"]\n"
+                do: ""
+            discard f.write! """.name = \"\{cfg.project_root.stem}\"
+.version = \"0.1.0\"
+.type = \{if cfg.lib, do "\"lib\"", do "\"app\" # or \"lib\""}
+\{author}
+# .license = \"MIT\"
+# .description = \"\"
+# specify description, license, etc.
+"""
+    print! "\{ac.GREEN}Initialized\{ac.RESET}: \{if cfg.lib, do "library", do "application"} package"
+
+.new! cfg: Config =
+    name = cfg.args[1]
+    new_path = cfg.project_root.joinpath(name)
+    if new_path.exists!(), do:
+        panic "\{ac.RED}Error\{ac.RESET}: \{new_path} already exists"
+    new_path.mkdir!()
+    chdir! new_path
+    cfg_ = Config.new {
+        .project_root = new_path;
+        .mode = cfg.mode;
+        .debug = cfg.debug;
+        .lib = cfg.lib;
+        .no_verify = cfg.no_verify;
+        .allow_dirty = cfg.allow_dirty;
+        .certified = cfg.certified;
+        .args = cfg.args;
+    }
+    .initialize! cfg_, "."
+    print! "\{ac.GREEN}Created\{ac.RESET}: \{name}"

@@ -1,0 +1,272 @@
+zipfile = pyimport "zipfile"
+os = pyimport "os"
+sub = pyimport "subprocess"
+
+{SemVer;} = import "semver"
+ac = import "ansicolor"
+
+{load_package_er_as_json!; load_er_as_json!} = import "metadata"
+
+erg_path = os.environ["ERG_PATH"]
+
+.PackageName = Class {
+    .namespace = Str; # "certified" or developer
+    .name = Str;
+}
+.PackageName|<: Show|.
+    __str__ ref self = "\{self.namespace}/\{self.name}"
+.PackageName|<: Eq|.
+    __eq__(self, other: PackageName): Bool =
+        self.namespace == other.namespace and self.name == other.name
+.PackageName|<: Hash|.
+    __hash__(self): Int =
+        hash(self.namespace) + hash(self.name)
+.PackageName.
+    parse(s: Str): PackageName =
+        if SemVer.is_valid(s), do:
+            panic "\{ac.RED}Error\{ac.RESET}: invalid package name `\{s}`"
+        segments = s.split("/")
+        match len(segments):
+            1 => .PackageName { .namespace = "certified"; .name = segments[0] }
+            2 => .PackageName { .namespace = segments[0]; .name = segments[1] }
+            _ => todo "\{ac.RED}Error\{ac.RESET}: invalid package name `\{s}`"
+    @Override
+    __repr__ self = self.__str__()
+    dir_name self =
+        if self.namespace == "certified":
+            do "certified/\{self.name}"
+            do "developers/\{self.namespace}/\{self.name}"
+
+.clone_package_index_if_not_exists!() =
+    if! not(os.path.exists!("\{erg_path}/package-index")), do!:
+        res = sub.run! ["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse", "https://github.com/erg-lang/package-index.git", "\{erg_path}/package-index"]
+        # discard sub.run! ["git", "clone", "https://github.com/erg-lang/package-index.git", "\{erg_path}/package-index"]
+        if! res.returncode != 0, do!:
+            assert res.stderr in Bytes
+            panic "failed to clone package-index:\n\{res.stderr.decode("utf-8")}"
+
+.enter_package_index!() =
+    .clone_package_index_if_not_exists!()
+    os.chdir! "\{erg_path}/package-index"
+    res0 = sub.run! ["git", "checkout", "main"], capture_output:=True
+    if! res0.returncode != 0, do!:
+        assert res0.stderr in Bytes
+        panic "failed to checkout package-index:\n\{res0.stderr.decode("utf-8")}"
+    res = sub.run! ["git", "pull", "--ff-only"], capture_output:=True
+    if! res.returncode != 0, do!:
+        assert res.stderr in Bytes
+        panic "failed to pull package-index:\n\{res.stderr.decode("utf-8")}"
+
+.cd_package! name: .PackageName =
+    .enter_package_index!()
+    os.chdir! name.dir_name()
+
+.download!(pkg: .PackageName) =
+    .enter_package_index!()
+    package_path = pkg.dir_name()
+    if! not(os.path.exists!(package_path)), do!:
+        print! "\{ac.BLUE}Downloading\{ac.RESET}: \{pkg}..."
+    res = sub.run! ["git", "sparse-checkout", "add", package_path], capture_output:=True
+    if! res.returncode != 0, do!:
+        assert res.stderr in Bytes
+        panic "failed to sparse-checkout package-index:\n\{res.stderr.decode("utf-8")}"
+    if not(os.path.exists!(package_path)), do:
+        panic "\{ac.RED}Error\{ac.RESET}: package `\{pkg}` not found"
+    package_path
+
+.download_cd!(pkg: .PackageName, path: Str or NoneType) =
+    path_ = if! path != None:
+        do path
+        do! .download! pkg
+    os.chdir! path_
+    path_
+
+download_git!(url: Str) =
+    namespace = url.split("/")[-2]
+    name = url.split("/")[-1].replace(".git", "")
+    path = "\{erg_path}/lib/pkgs/\{namespace}/\{name}"
+    if! not(os.path.exists!(path)), do!:
+        print! "\{ac.BLUE}Downloading\{ac.RESET}: \{url}..."
+        discard sub.run! ["git", "clone", url, path], capture_output:=True
+    path
+
+Package = Class {
+    .as_name = Str;
+    .version = SemVer;
+    .path = Str or NoneType;
+    .type = { "lib", "app", "decl", "hybrid" };
+    .used_in = { "build", "run", "test" };
+}
+Package.
+    new as_name, version, path, type, used_in := "run" =
+        Package { .as_name; .version; .path; .type; .used_in }
+.Versions! = Class Dict! { .PackageName: Array!(Package) }
+.Versions!|<: Show|.
+    __str__ ref self = "\{self::base}"
+.Versions!|<: Eq|.
+    __eq__(ref self, other: Ref .Versions!): Bool =
+        hasattr(other, "::base") and self::base == other::base
+.Versions!.
+    new!() =
+        cwd = os.getcwd!()
+        .enter_package_index!()
+        discard sub.run! ["git", "sparse-checkout", "set"], capture_output:=True
+        os.chdir! cwd
+        .Versions! !{:}
+    insert!(ref! self, name: .PackageName, as_name: Str, version: SemVer, path: Str or NoneType, type) =
+        if! self::base.get(name) == None:
+            do!:
+                self::base.insert! name, ![Package.new(as_name, version, path, type)]
+            do!:
+                if! all(map((pack) -> not(pack.version.compatible_with(version)), self::base[name])), do!:
+                    self::base[name].push!(Package.new(as_name, version, path, type))
+    extend!(ref! self, other: .Versions!) =
+        self::base.merge! other::base
+    items(ref self): DictItems((PackageName, [Package; _])) =
+        self::base.items()
+    '''
+    Dependencies include the package itself
+    '''
+    resolve_dependencies_of!(ref! self, name: Str, as_name: Str, version: Str or NoneType := None, path: Str or NoneType := None) =
+        cwd = os.getcwd!()
+        ver = if! version != None:
+            do SemVer.from_str(version)
+            do! get_latest_version! name, path
+        pkg_name = .PackageName.parse(name)
+        if! pkg_name in self::base, do!:
+            os.chdir! cwd
+            self.resolve_dependencies_of!::return None
+        _ = .download_cd! pkg_name, path
+        metadata = load_package_er_as_json!()
+        type = metadata["type"]
+        assert type in {"lib", "app", "decl", "hybrid"}, "invalid package type: \{type}"
+        self.insert!(pkg_name, as_name, ver, path, type)
+        print! "\{ac.GREEN}Resolving dependencies\{ac.RESET}: \{name} v\{ver}"
+        self.resolve_dependencies!()
+        os.chdir! cwd
+    check_dependencies!(ref! self, deps: {Str: Obj}) =
+        for! deps.items(), ((as_name, value),) =>
+            match! value:
+                (ver: Str) =>
+                    self.resolve_dependencies_of!(as_name, as_name, ver)
+                { name; version } =>
+                    self.resolve_dependencies_of!(name, as_name, version)
+                (dic: { Str: Obj }) =>
+                    name = dic["name"]
+                    version = dic.get("version")
+                    path = dic.get("path")
+                    git = dic.get("git")
+                    assert name in Str
+                    assert version in (Str or NoneType)
+                    assert path in (Str or NoneType)
+                    assert git in (Str or NoneType)
+                    if! git != None:
+                        do!:
+                            path = download_git! git
+                            self.resolve_dependencies_of!(name, as_name, version, path)
+                        do!: self.resolve_dependencies_of!(name, as_name, version, path)
+                other =>
+                    panic "unknown dependency value: \{other}"
+    '''
+    Returns the package name and versions that should be downloaded
+    '''
+    resolve_dependencies!(ref! self) =
+        # use package.lock.er if exists
+        lock_file = Self.from_package_lock_er!()
+        if! lock_file != None, do!:
+            self.extend! lock_file
+            self.resolve_dependencies!::return None
+        json = load_package_er_as_json!()
+        deps = json.get("dependencies", None)
+        if! deps is! None, do!:
+            self.resolve_dependencies!::return None
+        assert deps in {Str: Obj}
+        self.check_dependencies! deps
+        test_deps = json.get("test_dependencies", None)
+        if! test_deps is! None, do!:
+            self.resolve_dependencies!::return None
+        assert test_deps in {Str: Obj}
+        self.check_dependencies! test_deps
+    from_packages!(packages: [{ Str: Str }; _]): .Versions! =
+        vers = .Versions!.new!()
+        for! packages, (pkg: {Str: Str}) =>
+            type = pkg.get("type", "lib")
+            assert type in {"lib", "app", "decl", "hybrid"}, "invalid package type: \{type}"
+            vers.insert!(
+                .PackageName.parse(pkg["name"]),
+                pkg["as_name"],
+                SemVer.from_str(pkg["version"]),
+                pkg.get("path"),
+                type,
+            )
+        vers
+    from_package_lock_er!(): .Versions! or NoneType =
+        if! not(os.path.exists! "package.lock.er"), do!:
+            .Versions!.from_package_lock_er!::return None
+        data = load_er_as_json! "package.lock.er"
+        assert data["packages"] in Array { Str: Str }
+        .Versions!.from_packages! data["packages"]
+    install_if_not_exists!(ref self, pip_check: Bool) =
+        for! self::base.items(), ((pkg, vers),) =>
+            for! vers, (pack,) =>
+                if! pack.path == None, do!:
+                    pkg_path = "\{erg_path}/lib/pkgs/\{pkg}/\{pack.version}"
+                    if! not(os.path.exists!(pkg_path)), do!:
+                        zip_path = "\{erg_path}/package-index/\{pkg.dir_name()}/\{pkg.name}-\{pack.version}.zip"
+                        if! not(os.path.exists!(zip_path)), do!:
+                            cwd = os.getcwd!()
+                            discard .download! pkg
+                            os.chdir! cwd
+                        zf = zipfile.ZipFile! zip_path
+                        zf.extractall! pkg_path
+                if! pip_check and pack.type == "decl", do!:
+                    installed = sub.run! ["pip", "show", pkg.name], capture_output:=True
+                    if! installed.returncode != 0, do!:
+                        print! "\{ac.BLUE}Installing\{ac.RESET}: \{pkg.name}..."
+                        res = sub.run! ["pip", "install", pkg.name], capture_output:=False
+                        if! res.returncode != 0, do!:
+                            assert res.stderr in Bytes
+                            panic "failed to install \{pkg.name}:\n\{res.stderr.decode("utf-8")}"
+
+get_latest_version!(name: Str, path: Str or NoneType): SemVer =
+    cwd = os.getcwd!()
+    pkg_name = .PackageName.parse(name)
+    _ = .download_cd! pkg_name, path
+    json = load_package_er_as_json!()
+    os.chdir! cwd
+    ver = json["version"]
+    assert ver in Str
+    SemVer.from_str ver
+
+.download_dependencies!() =
+    deps = .Versions!.new!()
+    deps.resolve_dependencies!()
+    deps.install_if_not_exists! True
+    make_lock_file! deps
+    deps
+
+.download_dependencies_on_demand!() =
+    deps = .Versions!.from_package_lock_er!()
+    if! deps != None:
+        do!:
+            deps.install_if_not_exists! False
+            deps
+        do! .download_dependencies!()
+
+make_lock_file!(vers: Ref .Versions!) =
+    buffer = !".version = \"1\"\n"
+    buffer.push! ".packages = [\n"
+    for! vers.items(), ((name, vers),) =>
+        for! vers, (pack) =>
+            buffer.push! "    {\n"
+            buffer.push! "        .name = \"\{name}\";\n"
+            buffer.push! "        .as_name = \"\{pack.as_name}\";\n"
+            buffer.push! "        .version = \"\{pack.version}\";\n"
+            buffer.push! "        .type = \"\{pack.type}\";\n"
+            buffer.push! "        .used_in = \"\{pack.used_in}\";\n"
+            if! pack.path != None, do!:
+                buffer.push! "        .path = \"\{pack.path}\";\n"
+            buffer.push! "    },\n"
+    buffer.push! "]\n"
+    with! open!("package.lock.er", "w"), f =>
+        discard f.write! str buffer

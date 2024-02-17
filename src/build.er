@@ -1,0 +1,71 @@
+{time!;} = pyimport "time"
+{mkdir!;} = pyimport "os"
+{exists!;} = pyimport "os/path"
+{move!;} = pyimport "shutil"
+subprocess = pyimport "subprocess"
+ac = import "ansicolor"
+
+{Versions!;} = import "download"
+{Config;} = import "cfg"
+{download_dependencies_on_demand!;} = import "download"
+{load_package_er_as_json!;} = import "metadata"
+
+.compile_command! vers: Versions! =
+    cmd as Array!(Str, _) = !["erg", "compile"]
+    metadata = load_package_er_as_json!()
+    if! metadata.get("py_command") isnot! None, do!:
+        cmd.push! "--py-command"
+        py_command = metadata["py_command"]
+        assert py_command in Str
+        cmd.push! py_command
+    # pass dependencies using `--use-package` option
+    for! vers.items(), ((name, vers),) =>
+        for! vers, (pack,) =>
+            if! pack.path == None:
+                do!:
+                    cmd.push! "--use-package"
+                    cmd.push! "\{name}"
+                    cmd.push! pack.as_name
+                    cmd.push! "\{pack.version}"
+                do!:
+                    cmd.push! "--use-local-package"
+                    cmd.push! "\{name}"
+                    cmd.push! pack.as_name
+                    cmd.push! "\{pack.version}"
+                    cmd.push! "\{pack.path}"
+    cmd
+
+.build! cfg: Config =
+    start = time!()
+    vers = download_dependencies_on_demand!()
+    cmd = .compile_command! vers
+    print! "\{ac.GREEN}Building\{ac.RESET}: \{cfg.project_root.stem}"
+    metadata = load_package_er_as_json!()
+    if! metadata.get("pre_build") isnot! None, do!:
+        path = metadata["pre_build"]
+        assert path in Str
+        print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (pre-build script)"
+        res = subprocess.run!(["erg", "run", path])
+        if! res.returncode != 0, do!:
+            panic "\{ac.RED}Error\{ac.RESET}: pre-build failed!"
+    entry as Str = if exists!("src/main.er"):
+        do "src/main.er"
+        do "src/lib.er"
+    cmd.push! entry
+    res = subprocess.run! cmd
+    if! res.returncode != 0, do!:
+        print! "\{ac.RED}Error\{ac.RESET}: build failed!"
+        exit 1
+    if! not(exists!("build")), do!:
+        mkdir! "build"
+    discard move! entry.replace(".er", ".pyc"), "build/\{cfg.project_root.stem}.pyc"
+    end = time!()
+    elapsed = end - start
+    print! "\{ac.GREEN}Finished\{ac.RESET}: elapsed \{"{:.3g}".format(elapsed)}s"
+    if! metadata.get("post_build") isnot! None, do!:
+        path = metadata["post_build"]
+        assert path in Str
+        print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (post-build script)"
+        res = subprocess.run!(["erg", "run", path])
+        if! res.returncode != 0, do!:
+            panic "\{ac.RED}Error\{ac.RESET}: post-build failed!"

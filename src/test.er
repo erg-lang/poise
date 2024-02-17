@@ -1,0 +1,61 @@
+sys = pyimport "sys"
+os = pyimport "os"
+sub = pyimport "subprocess"
+imp = pyimport "importlib"
+ac = import "ansicolor"
+exc = import "exception"
+{SemVer;} = import "semver"
+
+{compile_command!;} = import "build"
+{Config;} = import "cfg"
+{Versions!; download_dependencies_on_demand!} = import "download"
+{load_package_er_as_json!;} = import "metadata"
+
+.test! cfg: Config =
+    discard download_dependencies_on_demand!()
+    metadata = load_package_er_as_json!()
+    files = sorted os.listdir! "tests"
+    n_tests = !0
+    n_passed = !0
+    sys.path.insert! 0, os.getcwd!() + "/tests"
+    for! files, file =>
+        if! file.endswith(".er"), do!:
+            print! "\{ac.GREEN}Compiling\{ac.RESET}: \{file}"
+            path = "tests/" + file
+            name = metadata["name"]
+            version = SemVer.from_str str metadata["version"]
+            assert name in Str
+            # TODO: filter out src dependencies
+            vers = Versions!.from_package_lock_er!()
+            cmd = compile_command! if! vers != None, do! vers, do! Versions!.new!()
+
+            cmd.push! "--use-local-package"
+            cmd.push! name
+            cmd.push! name
+            cmd.push! str(version)
+            cmd.push! str(cfg.project_root.absolute())
+
+            cmd.push! path
+            res = sub.run! cmd, capture_output:=True
+            if! res.returncode != 0, do!:
+                print! "\{ac.RED}Error\{ac.RESET} in \{file}: compilation failed."
+                assert res.stderr in Bytes
+                panic res.stderr.decode("utf-8")
+            mod = imp.import_module file.replace(".er", "")
+            for! mod.__dict__.items(), ((name, value),) =>
+                if! name.startswith("test_"), do!:
+                    n_tests.inc!()
+                    func_name = getattr(value, "__name__", "???")
+                    print! "\{ac.GREEN}Running\{ac.RESET}:", func_name
+                    assert value in () => NoneType
+                    exc.try! value:
+                        (exception) =>
+                            print! "\{ac.RED}Error\{ac.RESET}:", func_name
+                            print! "Exception: \{exception}"
+                        () =>
+                            print! "\{ac.GREEN}OK\{ac.RESET}:", func_name
+                            n_passed.inc!()
+            os.remove! path.replace(".er", ".pyc")
+    res = if n_passed == n_tests, do "\{ac.GREEN}OK\{ac.RESET}", do "\{ac.RED}FAILED\{ac.RESET}"
+    print! "\{ac.YELLOW}Test result\{ac.RESET}: \{res}, \{n_passed} of \{n_tests} passed"
+    if n_passed != n_tests, do exit 1
