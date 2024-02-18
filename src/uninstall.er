@@ -1,7 +1,7 @@
 {exists!;} = pyimport "os/path"
+os = pyimport "os"
 {remove!;} = pyimport "os"
 platform = pyimport "platform"
-{getenv!;} = pyimport "os"
 ac = import "ansicolor"
 
 {load_package_er_as_json!;} = import "metadata"
@@ -19,7 +19,7 @@ ac = import "ansicolor"
     name = cfg.project_root.stem
     if type == "lib", do:
         panic "\{ac.RED}Error\{ac.RESET}: cannot uninstall \{metadata["name"]} bacause it is a library."
-    erg_path = getenv! "ERG_PATH"
+    erg_path = os.environ.get("ERG_PATH", os.path.expanduser!("~") + "/.erg")
     pyc_path = "\{erg_path}/bin/\{name}.pyc"
     exec_path = if platform.system!() == "Windows":
         do "\{erg_path}/bin/\{name}.bat"
@@ -31,7 +31,7 @@ ac = import "ansicolor"
     print! "\{ac.GREEN}Uninstalled\{ac.RESET}: \{name} v\{metadata.get("version", "???")} (\{exec_path})"
 
 .uninstall_package! _: Config, name: Str =
-    erg_path = getenv! "ERG_PATH"
+    erg_path = os.environ.get("ERG_PATH", os.path.expanduser!("~") + "/.erg")
     pyc_path = "\{erg_path}/bin/\{name}.pyc"
     exec_path = if platform.system!() == "Windows":
         do "\{erg_path}/bin/\{name}.bat"

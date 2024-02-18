@@ -86,7 +86,7 @@ create_pr! cfg: Config, user_name, metadata =
     validate_package_er metadata
     if! not(cfg.no_verify), do!:
         check!(cfg)
-    erg_path = os.environ["ERG_PATH"]
+    erg_path = os.environ.get("ERG_PATH", os.path.expanduser!("~") + "/.erg")
     user_name = .get_github_username!()
     clone_package_index_if_not_exists!()
     package_path = if cfg.certified, do "\{erg_path}/package-index/certified/\{cfg.project_root.stem}" , do "\{erg_path}/package-index/developers/\{user_name}/\{cfg.project_root.stem}"

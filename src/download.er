@@ -7,7 +7,7 @@ ac = import "ansicolor"
 
 {load_package_er_as_json!; load_er_as_json!} = import "metadata"
 
-erg_path = os.environ["ERG_PATH"]
+erg_path = os.environ.get("ERG_PATH", os.path.expanduser!("~") + "/.erg")
 
 .PackageName = Class {
     .namespace = Str; # "certified" or developer
