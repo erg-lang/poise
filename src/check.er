@@ -9,7 +9,7 @@ ac = import "ansicolor"
 
 .check!(cfg: Config) =
     start = time!()
-    vers = download_dependencies_on_demand!()
+    vers = download_dependencies_on_demand! cfg
     print! "\{ac.GREEN}Checking\{ac.RESET}: \{cfg.project_root.stem}"
     metadata = load_package_er_as_json!()
     if! metadata.get("pre_build") isnot! None, do!:

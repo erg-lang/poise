@@ -79,7 +79,7 @@ create_pr! cfg: Config, user_name, metadata =
     discard sub.run! ["git", "checkout", "main"], capture_output:=True
 
 .publish! cfg: Config =
-    discard download_dependencies_on_demand!()
+    discard download_dependencies_on_demand! cfg
     check_commit! cfg
     metadata = load_package_er_as_json!()
     assert metadata in {Str: Str or Array(Str) or Record}

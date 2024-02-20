@@ -11,6 +11,7 @@ sys = pyimport "sys"
     .no_verify = Bool;
     .allow_dirty = Bool;
     .certified = Bool;
+    .pip_check = Bool;
     .args = Array(Str);
 }
 .Config.
@@ -23,6 +24,7 @@ sys = pyimport "sys"
             .lib = "--lib" in sys.argv;
             .no_verify = "--no-verify" in sys.argv;
             .allow_dirty = "--allow-dirty" in sys.argv;
+            .pip_check = "--pip-check" in sys.argv;
             .certified = "--certified" in sys.argv;
             .args = sys.argv[1..10000];
         }

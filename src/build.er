@@ -37,7 +37,7 @@ ac = import "ansicolor"
 
 .build! cfg: Config =
     start = time!()
-    vers = download_dependencies_on_demand!()
+    vers = download_dependencies_on_demand! cfg
     cmd = .compile_command! vers
     print! "\{ac.GREEN}Building\{ac.RESET}: \{cfg.project_root.stem}"
     metadata = load_package_er_as_json!()

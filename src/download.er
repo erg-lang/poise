@@ -5,6 +5,7 @@ sub = pyimport "subprocess"
 {SemVer;} = import "semver"
 ac = import "ansicolor"
 
+{Config;} = import "cfg"
 {load_package_er_as_json!; load_er_as_json!} = import "metadata"
 
 erg_path = os.environ.get("ERG_PATH", os.path.expanduser!("~") + "/.erg")
@@ -245,11 +246,11 @@ get_latest_version!(name: Str, path: Str or NoneType): SemVer =
     make_lock_file! deps
     deps
 
-.download_dependencies_on_demand!() =
+.download_dependencies_on_demand!(cfg: Config) =
     deps = .Versions!.from_package_lock_er!()
     if! deps != None:
         do!:
-            deps.install_if_not_exists! False
+            deps.install_if_not_exists! cfg.pip_check
             deps
         do! .download_dependencies!()
 

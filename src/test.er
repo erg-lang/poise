@@ -12,7 +12,7 @@ exc = import "exception"
 {load_package_er_as_json!;} = import "metadata"
 
 .test! cfg: Config =
-    discard download_dependencies_on_demand!()
+    discard download_dependencies_on_demand! cfg
     metadata = load_package_er_as_json!()
     files = sorted os.listdir! "tests"
     n_tests = !0
