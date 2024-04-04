@@ -101,7 +101,7 @@ Package = Class {
 Package.
     new as_name, version, path, type, used_in := "run" =
         Package { .as_name; .version; .path; .type; .used_in }
-.Versions! = Class Dict! { .PackageName: Array!(Package) }
+.Versions! = Class Dict! { .PackageName: List!(Package) }
 .Versions!|<: Show|.
     __str__ ref self = "\{self::base}"
 .Versions!|<: Eq|.
@@ -205,7 +205,7 @@ Package.
         if! not(os.path.exists! "package.lock.er"), do!:
             .Versions!.from_package_lock_er!::return None
         data = load_er_as_json! "package.lock.er"
-        assert data["packages"] in Array { Str: Str }
+        assert data["packages"] in List { Str: Str }
         .Versions!.from_packages! data["packages"]
     install_if_not_exists!(ref self, pip_check: Bool) =
         for! self::base.items(), ((pkg, vers),) =>

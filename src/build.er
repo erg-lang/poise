@@ -11,7 +11,7 @@ ac = import "ansicolor"
 {load_package_er_as_json!;} = import "metadata"
 
 .compile_command! vers: Versions! =
-    cmd as Array!(Str, _) = !["erg", "compile"]
+    cmd as List!(Str, _) = !["erg", "compile"]
     metadata = load_package_er_as_json!()
     if! metadata.get("py_command") isnot! None, do!:
         cmd.push! "--py-command"

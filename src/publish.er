@@ -29,7 +29,7 @@ check_commit!(cfg: Config) =
         panic """\{ac.RED}Error\{ac.RESET}: There are uncommitted changes in the current branch.
 If you want to publish anyway, use the `--allow-dirty` flag."""
 
-validate_package_er(metadata: {Str: Str or Array(Str) or Record}) =
+validate_package_er(metadata: {Str: Str or List(Str) or Record}) =
     if metadata.get("name") == None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `name` is missing"
         do assert metadata["name"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `name` must be a string"
@@ -52,7 +52,7 @@ validate_package_er(metadata: {Str: Str or Array(Str) or Record}) =
                 "\{ac.RED}Error\{ac.RESET} in package.er: `type` must be \"app\", \"lib\", \"hybrid\" or \"decl\""
     if metadata.get("authors") == None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `authors` is missing"
-        do assert metadata["authors"] in Array(Str):
+        do assert metadata["authors"] in List(Str):
             "\{ac.RED}Error\{ac.RESET} in package.er: `authors` must be a list of strings"
 
 create_pr! cfg: Config, user_name, metadata =
@@ -82,7 +82,7 @@ create_pr! cfg: Config, user_name, metadata =
     discard download_dependencies_on_demand! cfg
     check_commit! cfg
     metadata = load_package_er_as_json!()
-    assert metadata in {Str: Str or Array(Str) or Record}
+    assert metadata in {Str: Str or List(Str) or Record}
     validate_package_er metadata
     if! not(cfg.no_verify), do!:
         check!(cfg)

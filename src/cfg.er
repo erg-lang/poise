@@ -12,7 +12,7 @@ sys = pyimport "sys"
     .allow_dirty = Bool;
     .certified = Bool;
     .pip_check = Bool;
-    .args = Array(Str);
+    .args = List(Str);
 }
 .Config.
     parse!(): Self =
