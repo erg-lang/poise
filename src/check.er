@@ -16,7 +16,10 @@ ac = import "ansicolor"
         path = metadata["pre_build"]
         assert path in Str
         print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (pre-build script)"
-        res = sub.run!(["erg", "run", path])
+        cmd = ["erg", "run", path]
+        if! cfg.verbose, do!:
+            print! " ".join cmd
+        res = sub.run! cmd
         if! res.returncode != 0, do!:
             panic "\{ac.RED}Error\{ac.RESET}: pre-build failed!"
     typ = metadata.get("type", "app")
@@ -44,6 +47,8 @@ ac = import "ansicolor"
                     cmd.push! "\{pack.version}"
                     cmd.push! "\{pack.path}"
     cmd.push! entry
+    if! cfg.verbose, do!:
+        print! " ".join cmd
     res = sub.run!(cmd, capture_output:=True)
     if! res.returncode != 0, do!:
         print! "\{ac.RED}Error\{ac.RESET}: compilation failed!"
@@ -54,7 +59,10 @@ ac = import "ansicolor"
         path = metadata["post_build"]
         assert path in Str
         print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (post-build script)"
-        res = sub.run!(["erg", "run", path])
+        cmd = ["erg", "run", path]
+        if! cfg.verbose, do!:
+            print! " ".join cmd
+        res = sub.run! cmd
         if! res.returncode != 0, do!:
             panic "\{ac.RED}Error\{ac.RESET}: post-build failed!"
     end = time!()

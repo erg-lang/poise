@@ -36,6 +36,8 @@ exc = import "exception"
             cmd.push! str(cfg.project_root.absolute())
 
             cmd.push! path
+            if! cfg.verbose, do!:
+                print! " ".join cmd
             res = sub.run! cmd, capture_output:=True
             if! res.returncode != 0, do!:
                 print! "\{ac.RED}Error\{ac.RESET} in \{file}: compilation failed."

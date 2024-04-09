@@ -62,6 +62,7 @@ initialize_tests! cfg: Config, path: PathLike =
         .allow_dirty = cfg.allow_dirty;
         .certified = cfg.certified;
         .pip_check = cfg.pip_check;
+        .verbose = cfg.verbose;
         .args = cfg.args;
     }
     .initialize! cfg_, "."

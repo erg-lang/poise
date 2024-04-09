@@ -45,13 +45,18 @@ ac = import "ansicolor"
         path = metadata["pre_build"]
         assert path in Str
         print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (pre-build script)"
-        res = subprocess.run!(["erg", "run", path])
+        cmd = ["erg", "run", path]
+        if! cfg.verbose, do!:
+            print! " ".join cmd
+        res = subprocess.run! cmd
         if! res.returncode != 0, do!:
             panic "\{ac.RED}Error\{ac.RESET}: pre-build failed!"
     entry as Str = if exists!("src/main.er"):
         do "src/main.er"
         do "src/lib.er"
     cmd.push! entry
+    if! cfg.verbose, do!:
+        print! " ".join cmd
     res = subprocess.run! cmd
     if! res.returncode != 0, do!:
         print! "\{ac.RED}Error\{ac.RESET}: build failed!"
@@ -66,6 +71,9 @@ ac = import "ansicolor"
         path = metadata["post_build"]
         assert path in Str
         print! "\{ac.GREEN}Running\{ac.RESET}: \{path} (post-build script)"
-        res = subprocess.run!(["erg", "run", path])
+        cmd = ["erg", "run", path]
+        if! cfg.verbose, do!:
+            print! " ".join cmd
+        res = subprocess.run! cmd
         if! res.returncode != 0, do!:
             panic "\{ac.RED}Error\{ac.RESET}: post-build failed!"

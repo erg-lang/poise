@@ -58,6 +58,7 @@ To use it as a dependency, add it to the "dependencies" list in the package.er f
         .allow_dirty = cfg.allow_dirty;
         .certified = cfg.certified;
         .pip_check = cfg.pip_check;
+        .verbose = cfg.verbose;
         .args = cfg.args;
     })
     .install_local! build_cfg

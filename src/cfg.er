@@ -12,6 +12,7 @@ sys = pyimport "sys"
     .allow_dirty = Bool;
     .certified = Bool;
     .pip_check = Bool;
+    .verbose = Bool;
     .args = List(Str);
 }
 .Config.
@@ -26,5 +27,6 @@ sys = pyimport "sys"
             .allow_dirty = "--allow-dirty" in sys.argv;
             .pip_check = "--pip-check" in sys.argv;
             .certified = "--certified" in sys.argv;
+            .verbose = "--verbose" in sys.argv;
             .args = sys.argv[1..10000];
         }

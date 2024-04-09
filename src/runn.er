@@ -22,4 +22,7 @@ ac = import "ansicolor"
         do "python"
         do "python3"
     assert which!(py_command) != None, "\{ac.RED}Error\{ac.RESET}: \{py_command} not found"
-    discard r! [py_command, "./build/\{cfg.project_root.stem}.pyc"] + cfg.args[1..10000]
+    cmd = [py_command, "./build/\{cfg.project_root.stem}.pyc"] + cfg.args[1..10000]
+    if! cfg.verbose, do!:
+        print! " ".join cmd
+    discard r! cmd
