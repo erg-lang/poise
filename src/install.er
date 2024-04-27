@@ -3,6 +3,7 @@ pathlib = pyimport "pathlib"
 {unpack_archive!;} = pyimport "shutil"
 {copy!;} = pyimport "shutil"
 {getcwd!; getenv!; chdir!; chmod!} = pyimport "os"
+{expanduser!;} = pyimport "os/path"
 ac = import "ansicolor"
 
 {load_package_er_as_json!;} = import "metadata"
@@ -24,7 +25,8 @@ ac = import "ansicolor"
 To use it as a dependency, add it to the "dependencies" list in the package.er file."""
     build! cfg
     name = cfg.project_root.stem
-    erg_path = getenv! "ERG_PATH"
+    default = expanduser!("~") + "/.erg"
+    erg_path = getenv! "ERG_PATH", default
     pyc_path_old = "build/\{name}.pyc"
     pyc_path = "\{erg_path}/bin/\{name}.pyc"
     copy! pyc_path_old, pyc_path
