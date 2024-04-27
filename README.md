@@ -15,6 +15,8 @@ This package manager is bundled with erg and is available via the `erg pack` sub
 erg src/main.er -- install
 ```
 
+Alternatively, you can use [ergup](https://github.com/mtshiba/ergup) to install poise automatically.
+
 ## Usage
 
 Actually, poise is inspired by cargo (Rust's package manager) and has almost the same command options.
