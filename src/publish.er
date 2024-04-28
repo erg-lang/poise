@@ -59,7 +59,9 @@ create_pr! cfg: Config, user_name, metadata =
     discard sub.run! ["git", "sparse-checkout", "disable"], capture_output:=True
     branch_name = "\{user_name}/\{cfg.project_root.stem}"
     dir_name = if cfg.certified, do "certified/\{cfg.project_root.stem}", do "developers/\{user_name}/\{cfg.project_root.stem}"
-    version = SemVer.from_str metadata["version"]
+    ver = metadata["version"]
+    assert ver in Str
+    version = SemVer.from_str ver
     file_name = "\{cfg.project_root.stem}-\{version}"
     if! sub.run!(["git", "show-ref", "refs/heads/\{branch_name}"], capture_output:=True).returncode == 0:
         do!:
