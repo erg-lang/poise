@@ -10,8 +10,11 @@ ac = import "ansicolor"
 {download_dependencies_on_demand!;} = import "download"
 {load_package_er_as_json!;} = import "metadata"
 
-.compile_command! vers: Versions! =
+.compile_command! vers: Versions!, cfg: Config =
     cmd as List!(Str, _) = !["erg", "compile"]
+    if! cfg.verbose, do!:
+        cmd.push! "--verbose"
+        cmd.push! "2"
     metadata = load_package_er_as_json!()
     if! metadata.get("py_command") isnot! None, do!:
         cmd.push! "--py-command"
@@ -38,7 +41,7 @@ ac = import "ansicolor"
 .build! cfg: Config =
     start = time!()
     vers = download_dependencies_on_demand! cfg
-    cmd = .compile_command! vers
+    cmd = .compile_command! vers, cfg
     print! "\{ac.GREEN}Building\{ac.RESET}: \{cfg.project_root.stem}"
     metadata = load_package_er_as_json!()
     if! metadata.get("pre_build") isnot! None, do!:

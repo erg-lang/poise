@@ -27,7 +27,7 @@ exc = import "exception"
             assert name in Str
             # TODO: filter out src dependencies
             vers = Versions!.from_package_lock_er!()
-            cmd = compile_command! if! vers != None, do! vers, do! Versions!.new!()
+            cmd = compile_command! if!(vers != None, do! vers, do! Versions!.new!()), cfg
 
             cmd.push! "--use-local-package"
             cmd.push! name
