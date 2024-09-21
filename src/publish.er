@@ -29,28 +29,28 @@ check_commit!(cfg: Config) =
         panic """\{ac.RED}Error\{ac.RESET}: There are uncommitted changes in the current branch.
 If you want to publish anyway, use the `--allow-dirty` flag."""
 
-validate_package_er(metadata: {Str: Str or List(Str) or Record}) =
-    if metadata.get("name") == None:
+validate_package_er!(metadata: {Str: Str or List(Str) or Record}) =
+    if metadata.get("name") is! None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `name` is missing"
         do assert metadata["name"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `name` must be a string"
-    if metadata.get("version") == None:
+    if metadata.get("version") is! None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `version` is missing"
         do:
             assert metadata["version"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `version` must be a string or a Version"
             discard SemVer.from_str metadata["version"]
-    if metadata.get("description") == None:
+    if metadata.get("description") is! None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `description` is missing"
         do assert metadata["description"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `description` must be a string"
-    if metadata.get("license") == None:
+    if metadata.get("license") is! None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `license` is missing"
         do assert metadata["license"] in Str, "\{ac.RED}Error\{ac.RESET} in package.er: `license` must be a string"
-    if metadata.get("type") == None:
+    if metadata.get("type") is! None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `type` is missing (\"app\", \"lib\", \"hybrid\" or \"decl\")"
         do:
             assert metadata["type"] in Str
             assert metadata["type"] in {"app", "lib", "hybrid", "decl"}:
                 "\{ac.RED}Error\{ac.RESET} in package.er: `type` must be \"app\", \"lib\", \"hybrid\" or \"decl\""
-    if metadata.get("authors") == None:
+    if metadata.get("authors") is! None:
         do panic "\{ac.RED}Error\{ac.RESET} in package.er: `authors` is missing"
         do assert metadata["authors"] in List(Str):
             "\{ac.RED}Error\{ac.RESET} in package.er: `authors` must be a list of strings"
@@ -85,7 +85,7 @@ create_pr! cfg: Config, user_name, metadata =
     check_commit! cfg
     metadata = load_package_er_as_json!()
     assert metadata in {Str: Str or List(Str) or Record}
-    validate_package_er metadata
+    validate_package_er! metadata
     if! not(cfg.no_verify), do!:
         check!(cfg)
     erg_path = os.environ.get("ERG_PATH", os.path.expanduser!("~") + "/.erg")
