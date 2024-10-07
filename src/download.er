@@ -188,7 +188,7 @@ Package.
             self.resolve_dependencies!::return None
         assert test_deps in {Str: Obj}
         self.check_dependencies! test_deps
-    from_packages!(packages: [{ Str: Str }; _]): .Versions! =
+    from_packages!(packages: [{ Str: Str }; _]) =
         vers = .Versions!.new!()
         for! packages, (pkg: {Str: Str}) =>
             type = pkg.get("type", "lib")

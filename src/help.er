@@ -5,14 +5,15 @@ USAGE:
     erg pack [COMMAND] [ARGS]...
 
 Commands:
-    build     Build the project
+    build     Build the package
+    check     Check the package
     clean     Clear the cache
     help      Print this help message
-    init      Initialize the project
+    init      Initialize the package
     install   Install specified packages
     uninstall Uninstall specified packages
-    metadata  Print the project metadata
-    publish   Publish the project to package-index
-    run       Run the project
-    update    Update the project dependencies
+    metadata  Print the package metadata
+    publish   Publish the package to package-index
+    run       Run the package
+    update    Update the package dependencies
 """
